@@ -16,91 +16,132 @@ const RouteRenderer = ({ source, destination, vehicle, setRouteStats, tollGates 
 
         const fetchRoutes = async () => {
             try {
-                // 1. Standard Route (Fastest, usually includes tolls)
-                const stdUrl = `https://router.project-osrm.org/route/v1/driving/${source.lng},${source.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`;
-                const stdRes = await axios.get(stdUrl);
+                let stdUrl, optUrl;
 
-                let stdData = null;
-                if (stdRes.data.routes && stdRes.data.routes.length > 0) {
-                    const route = stdRes.data.routes[0];
-                    stdData = {
-                        coordinates: route.geometry.coordinates.map(c => [c[1], c[0]]), // Flip to [lat, lng]
-                        distance: (route.distance / 1000).toFixed(2), // km
-                        duration: (route.duration / 60).toFixed(0), // min
-                        rawCoordinates: route.geometry.coordinates // [lng, lat] for OSRM
-                    };
+                // Use GeoJSON to avoid needing extra polyline library
+                if (vehicle === 'car') {
+                    stdUrl = `https://router.project-osrm.org/route/v1/driving/${source.lng},${source.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`;
+                    // Try optimal route, maybe it works, maybe it fails 400
+                    optUrl = `https://router.project-osrm.org/route/v1/driving/${source.lng},${source.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson&exclude=toll`;
+                } else {
+                    stdUrl = `https://router.project-osrm.org/route/v1/driving/${source.lng},${source.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`;
                 }
 
-                // 2. Optimal Route (Exclude Tolls)
-                const optUrl = `https://router.project-osrm.org/route/v1/driving/${source.lng},${source.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson&exclude=toll`;
-                const optRes = await axios.get(optUrl);
-
-                let optData = null;
-                if (optRes.data.routes && optRes.data.routes.length > 0) {
-                    const route = optRes.data.routes[0];
-                    optData = {
-                        coordinates: route.geometry.coordinates.map(c => [c[1], c[0]]),
-                        distance: (route.distance / 1000).toFixed(2),
-                        duration: (route.duration / 60).toFixed(0),
-                        rawCoordinates: route.geometry.coordinates
-                    };
-                }
-
-                // Calculate Toll Costs
-                const calculateCost = (routeCoords) => {
-                    if (!routeCoords) return 0;
+                // Calculate Toll logic
+                const calculateToll = (routeCoords) => {
+                    if (!routeCoords || !tollGates || tollGates.length === 0) return 0;
                     let cost = 0;
-                    // For each toll gate, check if route passes near it (simple proximity check)
-                    // Optimization: Check if toll gate is roughly between source and dest bounds? 
-                    // Or just iterate all tolls (since N is small < 100)
-
-                    if (tollGates && tollGates.length > 0) {
-                        tollGates.forEach(gate => {
-                            // Check if any point on route is within ~250m of a toll gate
-                            // This is expensive for long routes with many points.
-                            // Sampling points or spatial index would be better.
-                            // For prototype, we'll check every 10th point or if the gate is 'on' the path.
-
-                            // Let's use a simple bounding box check first
-
-                            const isNear = routeCoords.some((coord, index) => {
-                                if (index % 5 !== 0) return false; // Optimization: check every 5th point
-                                const dist = map.distance(coord, [gate.location.lat, gate.location.lng]);
-                                return dist < 250; // 250 meters
-                            });
-
-                            if (isNear) {
-                                cost += vehicle === 'bike' ? (gate.cost.bike || 0) : (gate.cost.car || 0);
-                            }
+                    tollGates.forEach(gate => {
+                        // Simple optimization: check every 10th point
+                        const isNear = routeCoords.some((coord, index) => {
+                            if (index % 10 !== 0) return false;
+                            const dist = map.distance(coord, [gate.location.lat, gate.location.lng]);
+                            return dist < 500; // Increased radius to 500m to be safe
                         });
-                    }
+                        if (isNear) {
+                            cost += vehicle === 'bike' ? (gate.cost.bike || 0) : (gate.cost.car || 0);
+                        }
+                    });
                     return cost;
                 };
 
-                const stdCost = stdData ? calculateCost(stdData.coordinates) : 0;
-                const optCost = optData ? calculateCost(optData.coordinates) : 0;
+                const results = await Promise.allSettled([
+                    axios.get(stdUrl),
+                    (vehicle === 'car' && optUrl) ? axios.get(optUrl) : Promise.resolve(null)
+                ]);
 
+                const stdResult = results[0];
+                const optResult = results[1];
+
+                if (stdResult.status === 'rejected') {
+                    console.error("Standard route failed:", stdResult.reason);
+                    alert("Failed to find route. OSRM might be busy or unreachable.");
+                    return;
+                }
+
+                const stdRes = stdResult.value;
+                const optRes = (optResult.status === 'fulfilled') ? optResult.value : null;
+
+                if (optResult.status === 'rejected') {
+                    console.warn("Optimal route failed (likely not supported):", optResult.reason);
+                }
+
+                if (!stdRes.data.routes || stdRes.data.routes.length === 0) {
+                    alert("No route found!");
+                    return;
+                }
+
+                // Process Standard Route
+                const mainRoute = stdRes.data.routes[0];
+                // GeoJSON coordinates are [lng, lat]. Leaflet needs [lat, lng].
+                const stdPath = mainRoute.geometry.coordinates.map(c => [c[1], c[0]]);
+
+                const stdData = {
+                    coordinates: stdPath,
+                    distance: (mainRoute.distance / 1000).toFixed(2),
+                    duration: (mainRoute.duration / 60).toFixed(0),
+                    cost: calculateToll(stdPath)
+                };
                 setStandardRoute(stdData);
-                setOptimalRoute(optData);
 
-                // Update Stats in Parent
-                setRouteStats({
-                    standard: stdData ? { ...stdData, cost: stdCost } : null,
-                    optimal: optData ? { ...optData, cost: optCost } : null
-                });
+                // Process Optimal Route
+                let optData = null;
+                if (optRes && optRes.data.routes.length > 0) {
+                    const altRoute = optRes.data.routes[0];
+                    const optPath = altRoute.geometry.coordinates.map(c => [c[1], c[0]]);
 
-                // Fit bounds to show both routes
-                if (stdData) {
-                    const bounds = L.latLngBounds(stdData.coordinates);
-                    if (optData) {
-                        bounds.extend(optData.coordinates);
+                    optData = {
+                        coordinates: optPath,
+                        distance: (altRoute.distance / 1000).toFixed(2),
+                        duration: (altRoute.duration / 60).toFixed(0),
+                        cost: calculateToll(optPath)
+                    };
+                    setOptimalRoute(optData);
+                } else {
+                    setOptimalRoute(null);
+                }
+
+                // Calculate Finances
+                const stdFuel = (stdData.distance / 15 * 105).toFixed(0);
+                const stdTotal = stdData.cost + parseFloat(stdFuel);
+
+                let stats = {
+                    distance: stdData.distance,
+                    duration: stdData.duration,
+                    tollCost: stdData.cost,
+                    fuelCost: stdFuel,
+                    totalCost: stdTotal
+                };
+
+                if (optData) {
+                    const optFuel = (optData.distance / 15 * 105).toFixed(0);
+                    const optTotal = optData.cost + parseFloat(optFuel);
+
+                    // Only show optimal if it saves money
+                    if (optTotal < stdTotal) {
+                        stats.optimal = {
+                            distance: optData.distance,
+                            duration: optData.duration,
+                            tollCost: optData.cost,
+                            fuelCost: optFuel,
+                            totalCost: optTotal,
+                            savings: (stdTotal - optTotal).toFixed(0)
+                        };
                     }
+                }
+
+                setRouteStats(stats);
+
+                // Fit bounds
+                if (map && stdPath.length > 0) {
+                    const bounds = L.latLngBounds(stdPath);
+                    if (optData) bounds.extend(optData.coordinates);
                     map.fitBounds(bounds, { padding: [50, 50] });
                 }
 
             } catch (error) {
-                console.error("Error fetching routes:", error);
-                alert("Failed to find route. OSRM might be busy or unreachable.");
+                console.error("Error processing routes:", error);
+                alert("An error occurred while calculating the route.");
             }
         };
 

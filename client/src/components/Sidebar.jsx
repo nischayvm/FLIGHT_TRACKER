@@ -104,7 +104,10 @@ const Sidebar = ({ source, setSource, destination, setDestination, vehicle, setV
                 </div>
             </div>
 
-            <button className="calculate-btn" onClick={onCalculate}>
+            <button className="calculate-btn" onClick={() => {
+                console.log("Calculate button clicked");
+                onCalculate();
+            }}>
                 Calculate Routes
             </button>
 

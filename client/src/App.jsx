@@ -14,7 +14,9 @@ function App() {
   // Fetch Tolls
   useEffect(() => {
     // Replace with your actual IP if testing on mobile or network
-    axios.get('http://localhost:5000/api/tolls')
+    // Use environment variable for API URL (defaults to localhost if not set)
+    const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    axios.get(`${apiUrl}/api/tolls`)
       .then(res => setTollGates(res.data))
       .catch(err => console.error(err));
   }, []);
@@ -38,19 +40,28 @@ function App() {
   };
 
   const handleCalculate = async () => {
+    console.log("handleCalculate called", { source, destination });
     if (!source.name || !destination.name) {
+      console.log("Missing source or destination name");
       alert("Please enter both locations");
       return;
     }
 
     // Geocode both
+    console.log("Geocoding source...");
     const srcCoords = await geocode(source.name);
+    console.log("Source coords:", srcCoords);
+
+    console.log("Geocoding destination...");
     const destCoords = await geocode(destination.name);
+    console.log("Destination coords:", destCoords);
 
     if (srcCoords && destCoords) {
+      console.log("Updating state with new coords");
       setSource({ ...source, ...srcCoords });
       setDestination({ ...destination, ...destCoords });
     } else {
+      console.error("Geocoding failed for one or both locations");
       alert("Could not find one of the locations");
     }
   };
