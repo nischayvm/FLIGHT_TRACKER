@@ -1,0 +1,299 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap');
+
+:root {
+  --glass-bg: rgba(20, 25, 40, 0.9);
+  /* More opaque for contrast */
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --accent-color: #00f2ff;
+  /* Cyan Neon */
+  --text-primary: #ffffff;
+  --text-secondary: #a0aec0;
+  --panel-radius: 16px;
+  --sidebar-width: 320px;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: 'Outfit', sans-serif;
+  background-color: #0f172a;
+  color: var(--text-primary);
+}
+
+/* Map specific override */
+.leaflet-container {
+  background: #0f172a !important;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* Dark Mode Map Filter */
+.dark-map-layer {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
+
+/* Custom Plane Icon */
+.plane-icon {
+  background: transparent;
+  border: none;
+  transition: all 0.3s ease;
+  z-index: 1000 !important;
+}
+
+/* Sidebar Styling - Left Side */
+.sidebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-width);
+  z-index: 2000;
+  /* Above map */
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+}
+
+/* Glass Panel Utility */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid var(--glass-border);
+  box-shadow: 4px 0 32px 0 rgba(0, 0, 0, 0.5);
+  border-top-right-radius: var(--panel-radius);
+  border-bottom-right-radius: var(--panel-radius);
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.sidebar-header h2 {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1.4rem;
+  color: #fff;
+}
+
+.live-badge {
+  background: rgba(255, 0, 0, 0.2);
+  color: #ff4d4d;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  border: 1px solid rgba(255, 0, 0, 0.3);
+  animation: pulse 2s infinite;
+}
+
+/* Stats Row */
+.stats-row {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.stat-card {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 10px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.stat-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+/* Flight List Section - KEY FIX: Flex 1 and Overflow Auto */
+.flight-list-container {
+  flex: 1;
+  /* Grow to fill available space */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Restrict container */
+  min-height: 0;
+  /* Allow flex shrinking */
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.flight-list-container h3 {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.flight-list {
+  flex: 1;
+  /* Fill container */
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 4px;
+}
+
+/* Custom Scrollbar */
+.flight-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.flight-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.flight-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.flight-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.flight-item {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.flight-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.flight-item.active {
+  background: rgba(0, 242, 255, 0.1);
+  border-color: var(--accent-color);
+}
+
+.flight-icon {
+  font-size: 1rem;
+  color: var(--accent-color);
+}
+
+.flight-info-row {
+  display: flex;
+  flex-direction: column;
+}
+
+.flight-callsign {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.flight-country {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.flight-sub {
+  font-size: 0.65rem;
+  color: #666;
+}
+
+/* Details Section */
+.flight-details {
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 12px;
+  padding: 14px;
+  border: 1px solid var(--accent-color);
+  box-shadow: 0 0 15px rgba(0, 242, 255, 0.1);
+}
+
+.details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 5px;
+}
+
+.details-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--accent-color);
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 1.2rem;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-item label {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
+.detail-item span {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.footer {
+  margin-top: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 8px;
+  text-align: center;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
